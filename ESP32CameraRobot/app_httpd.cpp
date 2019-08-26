@@ -206,6 +206,55 @@ static esp_err_t stream_handler(httpd_req_t *req)
     return res;
 }
 
+static esp_err_t stream_vga(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_VGA);
+    return stream_handler(req);
+}
+
+static esp_err_t stream_cif(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_CIF);
+    return stream_handler(req);
+}
+
+static esp_err_t stream_qvga(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_QVGA);
+    return stream_handler(req);
+}
+
+static esp_err_t stream_hqvga(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_HQVGA);
+    return stream_handler(req);
+}
+
+static esp_err_t stream_qcif(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_QCIF);
+    return stream_handler(req);
+}
+
+static esp_err_t stream_qqvga2(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_QQVGA2);
+    return stream_handler(req);
+}
+
+static esp_err_t stream_qqvga(httpd_req_t *req)
+{
+    sensor_t *s = esp_camera_sensor_get();
+    s->set_framesize(s, FRAMESIZE_QQVGA);
+    return stream_handler(req);
+}
+
 static esp_err_t cmd_handler(httpd_req_t *req)
 {
     char *buf;
@@ -408,6 +457,48 @@ void startCameraServer()
         .handler = stream_handler,
         .user_ctx = NULL};
 
+    httpd_uri_t stream_vga_uri = {
+        .uri = "/vga",
+        .method = HTTP_GET,
+        .handler = stream_vga,
+        .user_ctx = NULL};
+
+    httpd_uri_t stream_cif_uri = {
+        .uri = "/cif",
+        .method = HTTP_GET,
+        .handler = stream_cif,
+        .user_ctx = NULL};
+
+    httpd_uri_t stream_qvga_uri = {
+        .uri = "/qvga",
+        .method = HTTP_GET,
+        .handler = stream_qvga,
+        .user_ctx = NULL};
+
+    httpd_uri_t stream_hqvga_uri = {
+        .uri = "/hqvga",
+        .method = HTTP_GET,
+        .handler = stream_hqvga,
+        .user_ctx = NULL};
+
+    httpd_uri_t stream_qcif_uri = {
+        .uri = "/qcif",
+        .method = HTTP_GET,
+        .handler = stream_qcif,
+        .user_ctx = NULL};
+
+    httpd_uri_t stream_qqvga2_uri = {
+        .uri = "/qqvga2",
+        .method = HTTP_GET,
+        .handler = stream_qqvga2,
+        .user_ctx = NULL};
+
+    httpd_uri_t stream_qqvga_uri = {
+        .uri = "/qqvga",
+        .method = HTTP_GET,
+        .handler = stream_qqvga,
+        .user_ctx = NULL};
+
     ra_filter_init(&ra_filter, 20);
 
     Serial.printf("Starting web server on port: '%d'\n", config.server_port);
@@ -425,5 +516,12 @@ void startCameraServer()
     if (httpd_start(&stream_httpd, &config) == ESP_OK)
     {
         httpd_register_uri_handler(stream_httpd, &stream_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_vga_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_cif_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_qvga_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_hqvga_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_qcif_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_qqvga2_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_qqvga_uri);
     }
 }

@@ -1,6 +1,33 @@
 #define SSID_NAME "ESP32CameraRobot"
 #define SSID_PASSWORD ""
-#define URL "http://192.168.4.1:81/stream"
+// #define URL "http://192.168.4.1:81/vga"
+// #define JPG_SCALE JPG_SCALE_2X
+// #define JPG_WIDTH 640
+// #define JPG_HEIGHT 480
+// #define DISP_WIDTH 320
+// #define DISP_HEIGHT 240
+// #define RATIO_BOUND 10
+//  #define URL "http://192.168.4.1:81/qvga"
+//  #define JPG_SCALE JPG_SCALE_NONE
+//  #define JPG_WIDTH 320
+//  #define JPG_HEIGHT 240
+//  #define DISP_WIDTH 320
+//  #define DISP_HEIGHT 240
+//  #define RATIO_BOUND 10
+// #define URL "http://192.168.4.1:81/hqvga"
+// #define JPG_SCALE JPG_SCALE_NONE
+// #define JPG_WIDTH 240
+// #define JPG_HEIGHT 160
+// #define DISP_WIDTH 240
+// #define DISP_HEIGHT 160
+// #define RATIO_BOUND 10
+#define URL "http://192.168.4.1:81/qcif"
+#define JPG_SCALE JPG_SCALE_NONE
+#define JPG_WIDTH 176
+#define JPG_HEIGHT 144
+#define DISP_WIDTH 176
+#define DISP_HEIGHT 144
+#define RATIO_BOUND 8
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -16,15 +43,11 @@ Arduino_ST7789 *tft = new Arduino_ST7789(bus, 33 /* RST */, 1 /* rotation */, tr
 // Arduino_HWSPI *bus = new Arduino_HWSPI(27 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
 // Arduino_ST7789 *tft = new Arduino_ST7789(bus, 33 /* RST */, 3 /* rotation */, true /* IPS */);
 
-#define WIDTH 320
-#define HEIGHT 240
-#define RATIO_BOUND 10
-
 typedef struct
 {
   int len;
   int offset;
-  uint8_t buff[2 * WIDTH * HEIGHT / RATIO_BOUND];
+  uint8_t *buff;
 } buffer_t;
 
 buffer_t buffer1;
@@ -42,7 +65,7 @@ void setup()
   Serial.begin(115200);
   tft->begin();
   tft->fillScreen(BLACK);
-  // tft->setAddrWindow(40, 30, WIDTH, HEIGHT);
+  tft->setAddrWindow((tft->width() - DISP_WIDTH) / 2, (tft->height() - DISP_HEIGHT) / 2, DISP_WIDTH, DISP_HEIGHT);
 
   WiFi.begin(SSID_NAME, SSID_PASSWORD);
 
@@ -51,7 +74,9 @@ void setup()
   digitalWrite(TFT_BL, HIGH);
 #endif
 
-  framebuffer = (uint16_t *)heap_caps_malloc(WIDTH * HEIGHT * 2, MALLOC_CAP_SPIRAM);
+  buffer1.buff = (uint8_t *)heap_caps_malloc(2 * JPG_WIDTH * JPG_HEIGHT / RATIO_BOUND, MALLOC_CAP_SPIRAM);
+  buffer2.buff = (uint8_t *)heap_caps_malloc(2 * JPG_WIDTH * JPG_HEIGHT / RATIO_BOUND, MALLOC_CAP_SPIRAM);
+  framebuffer = (uint16_t *)heap_caps_malloc(DISP_WIDTH * DISP_WIDTH * 2, MALLOC_CAP_SPIRAM);
 }
 
 void loop()
@@ -219,14 +244,14 @@ void drawFramebufferTask(void *parameter)
   buffer_t *b = (buffer_t *)parameter;
 
   Serial.printf("[JPG] start: %d\n", millis());
-  esp_jpg_decode(b->len, JPG_SCALE_NONE, buff_reader, framebuffer_writer, b /* arg */);
+  esp_jpg_decode(b->len, JPG_SCALE, buff_reader, framebuffer_writer, b /* arg */);
   Serial.printf("[JPG] end: %d\n", millis());
 
   bufflock = false;
 
   Serial.printf("[TFT] start: %d\n", millis());
   tft->startWrite();
-  tft->writePixels(framebuffer, WIDTH * HEIGHT * 2);
+  tft->writePixels(framebuffer, DISP_WIDTH * DISP_HEIGHT * 2);
   tft->endWrite();
   Serial.printf("[TFT] end: %d\n", millis());
 
@@ -261,7 +286,7 @@ static bool framebuffer_writer(void *arg, uint16_t x, uint16_t y, uint16_t w, ui
     {
       for (int j = 0; j < w; j++)
       {
-        framebuffer[(y + i) * WIDTH + x + j] = tft->color565(*(data++), *(data++), *(data++));
+        framebuffer[(y + i) * DISP_WIDTH + x + j] = tft->color565(*(data++), *(data++), *(data++));
       }
     }
   }

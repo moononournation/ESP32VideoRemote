@@ -8,13 +8,20 @@
 
 #include <WiFi.h>
 #include <WiFiAP.h>
+#include <esp_wifi.h>
 #include <esp_camera.h>
 
 #include "camera_pins.h"
 
 #define SOFTAP
+#ifdef SOFTAP
 const char* ssid = "ESP32CameraRobot";
 const char* password = "";
+const int channel = 8;
+#else
+const char* ssid = "YourAP";
+const char* password = "YourPassword";
+#endif
 
 void startCameraServer();
 
@@ -54,8 +61,8 @@ void setup()
   }
   else
   {
-    config.frame_size = FRAMESIZE_QVGA;
-    config.jpeg_quality = 4;
+    config.frame_size = FRAMESIZE_VGA;
+    config.jpeg_quality = 10;
     config.fb_count = 2;
   }
 
@@ -85,22 +92,19 @@ void setup()
     // s->set_brightness(s, 2);
     // s->set_contrast(s, 2);
     s->set_saturation(s, 2);
-    s->set_sharpness(s, 2);
     s->set_aec2(s, true);
-    s->set_denoise(s, true);
-    // s->set_lenc(s, true);
+    s->set_gainceiling(s, GAINCEILING_128X);
+    s->set_lenc(s, true);
   }
-  //drop down frame size for higher initial frame rate
-  s->set_framesize(s, FRAMESIZE_QVGA);
-  s->set_quality(s, 10);
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE)
   s->set_vflip(s, 1);
   s->set_hmirror(s, 1);
 #endif
 
+  esp_wifi_set_max_tx_power(127); // max tx
 #ifdef SOFTAP
-  WiFi.softAP(ssid, password);
+  WiFi.softAP(ssid, password, channel);
 #else
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
