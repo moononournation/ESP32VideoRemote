@@ -11,6 +11,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// test camera:
+// http://192.168.4.1/
+//
+// test servo:
+// http://192.168.4.1/servo?servo=0&pwm=320
+//
+// test pose:
+// close: http://10.0.1.47/pose?angles=0000000000000000&steps=10
+// open: http://10.0.1.47/pose?angles=9999999999999999&steps=10
+// stand: http://10.0.1.47/pose?angles=3855500000055583&steps=10
+// crouching: http://10.0.1.47/pose?angles=1500200000020051&steps=10
+// sit: http://10.0.1.47/pose?angles=1900300000030091&steps=10
 #include <Arduino.h>
 #include <esp_http_server.h>
 #include <esp_camera.h>
@@ -41,6 +54,45 @@ static ra_filter_t ra_filter;
 httpd_handle_t stream_httpd = NULL;
 httpd_handle_t camera_httpd = NULL;
 
+// define each servo pulsewidth range
+static int servo_range[16][2] = {
+    {1720, 720},  // 1, front left leg, range 1000
+    {710, 2010},  // 2, front left foot, range 1300
+    {1380, 2230}, // 3, back left leg A, range 850
+    {2300, 1450}, // 4, back left leg B, range 850
+    {780, 2080},  // 5, back left foot, range 1300
+    {670, 2400},  // 6, head, range 1730
+    {1000, 2000}, // 7
+    {1000, 2000}, // 8
+    {1000, 2000}, // 9
+    {1000, 2000}, // 10
+    {2400, 670},  // 11, tail, range 1730
+    {2380, 1080}, // 12, back right foot, range 1300
+    {850, 1700},  // 13, back right leg B, range 850
+    {1520, 670},  // 14, back right leg A, range 850
+    {2230, 930},  // 15, front right foot, range 1300
+    {1360, 2360}  // 16, front right leg, range 1000
+};
+
+static int current_positions[16] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+static int target_positions[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static int step_angles[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+static void test_pwm(uint8_t servo_id, int pwm)
+{
+    log_i("servo_id: %d, pwm: %d", servo_id, pwm);
+    target_positions[servo_id] = pwm;
+    step_angles[servo_id] = target_positions[servo_id] - current_positions[servo_id];
+}
+
+static void set_angle(uint8_t servo_id, int angle, int steps)
+{
+    log_i("servo_id: %d, angle: %d", servo_id, angle);
+    target_positions[servo_id] = map(angle, 0, 9, servo_range[servo_id][0], servo_range[servo_id][1]);
+    step_angles[servo_id] = (target_positions[servo_id] - current_positions[servo_id]) / steps;
+    current_positions[servo_id] = target_positions[servo_id] - (step_angles[servo_id] * steps);
+}
+
 static ra_filter_t *ra_filter_init(ra_filter_t *filter, size_t sample_size)
 {
     memset(filter, 0, sizeof(ra_filter_t));
@@ -65,11 +117,11 @@ static int ra_filter_run(ra_filter_t *filter, int value)
     filter->sum -= filter->values[filter->index];
     filter->values[filter->index] = value;
     filter->sum += filter->values[filter->index];
-    filter->index++;
+    ++filter->index;
     filter->index = filter->index % filter->size;
     if (filter->count < filter->size)
     {
-        filter->count++;
+        ++filter->count;
     }
     return filter->sum / filter->count;
 }
@@ -98,7 +150,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
     fb = esp_camera_fb_get();
     if (!fb)
     {
-        Serial.println("Camera capture failed");
+        log_e("Camera capture failed");
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
@@ -114,7 +166,7 @@ static esp_err_t capture_handler(httpd_req_t *req)
     res = httpd_resp_send(req, (const char *)fb->buf, fb->len);
     esp_camera_fb_return(fb);
     int64_t fr_end = esp_timer_get_time();
-    Serial.printf("JPG: %uB %ums\n", (uint32_t)(fb_len), (uint32_t)((fr_end - fr_start) / 1000));
+    log_i("JPG: %uB %ums\n", (uint32_t)(fb_len), (uint32_t)((fr_end - fr_start) / 1000));
     return res;
 }
 
@@ -146,7 +198,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         fb = esp_camera_fb_get();
         if (!fb)
         {
-            Serial.println("Camera capture failed");
+            log_e("Camera capture failed");
             res = ESP_FAIL;
         }
         else
@@ -195,7 +247,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
         last_frame = fr_end;
         frame_time /= 1000;
         uint32_t avg_frame_time = ra_filter_run(&ra_filter, frame_time);
-        Serial.printf("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps), %u+%u=%u\n",
+        log_i("MJPG: %uB %ums (%.1ffps), AVG: %ums (%.1ffps), %u+%u=%u\n",
                       (uint32_t)(_jpg_buf_len),
                       (uint32_t)frame_time, 1000.0 / (uint32_t)frame_time,
                       avg_frame_time, 1000.0 / avg_frame_time,
@@ -259,12 +311,8 @@ static esp_err_t cmd_handler(httpd_req_t *req)
 {
     char *buf;
     size_t buf_len;
-    char variable[32] = {
-        0,
-    };
-    char value[32] = {
-        0,
-    };
+    char variable[32] = {0};
+    char value[32] = {0};
 
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1)
@@ -411,6 +459,106 @@ static esp_err_t status_handler(httpd_req_t *req)
     return httpd_resp_send(req, json_response, strlen(json_response));
 }
 
+static esp_err_t servo_handler(httpd_req_t *req)
+{
+    char *buf;
+    size_t buf_len;
+    char servo[32] = {0};
+    char pwm[32] = {0};
+
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1)
+    {
+        buf = (char *)malloc(buf_len);
+        if (!buf)
+        {
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
+        {
+            if (httpd_query_key_value(buf, "servo", servo, sizeof(servo)) == ESP_OK &&
+                httpd_query_key_value(buf, "pwm", pwm, sizeof(pwm)) == ESP_OK)
+            {
+                test_pwm(atoi(servo), atoi(pwm));
+            }
+            else
+            {
+                free(buf);
+                httpd_resp_send_404(req);
+                return ESP_FAIL;
+            }
+        }
+        else
+        {
+            free(buf);
+            httpd_resp_send_404(req);
+            return ESP_FAIL;
+        }
+        free(buf);
+    }
+    else
+    {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, NULL, 0);
+}
+
+static esp_err_t pose_handler(httpd_req_t *req)
+{
+    char *buf;
+    size_t buf_len;
+    char angles[32] = {0};
+    char steps[32] = {0};
+
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1)
+    {
+        buf = (char *)malloc(buf_len);
+        if (!buf)
+        {
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
+        {
+            if (httpd_query_key_value(buf, "angles", angles, sizeof(angles)) == ESP_OK &&
+                httpd_query_key_value(buf, "steps", steps, sizeof(steps)) == ESP_OK)
+            {
+                int t = atoi(steps);
+                for (int i = 0; i < 16; ++i)
+                {
+                    set_angle(i, angles[i] - 0x30, t);
+                }
+            }
+            else
+            {
+                free(buf);
+                httpd_resp_send_404(req);
+                return ESP_FAIL;
+            }
+        }
+        else
+        {
+            free(buf);
+            httpd_resp_send_404(req);
+            return ESP_FAIL;
+        }
+        free(buf);
+    }
+    else
+    {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, NULL, 0);
+}
+
 static esp_err_t index_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
@@ -443,6 +591,18 @@ void startCameraServer()
         .uri = "/control",
         .method = HTTP_GET,
         .handler = cmd_handler,
+        .user_ctx = NULL};
+
+    httpd_uri_t servo_uri = {
+        .uri = "/servo",
+        .method = HTTP_GET,
+        .handler = servo_handler,
+        .user_ctx = NULL};
+
+    httpd_uri_t pose_uri = {
+        .uri = "/pose",
+        .method = HTTP_GET,
+        .handler = pose_handler,
         .user_ctx = NULL};
 
     httpd_uri_t capture_uri = {
@@ -501,18 +661,20 @@ void startCameraServer()
 
     ra_filter_init(&ra_filter, 20);
 
-    Serial.printf("Starting web server on port: '%d'\n", config.server_port);
+    log_i("Starting web server on port: '%d'\n", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK)
     {
         httpd_register_uri_handler(camera_httpd, &index_uri);
         httpd_register_uri_handler(camera_httpd, &cmd_uri);
         httpd_register_uri_handler(camera_httpd, &status_uri);
+        httpd_register_uri_handler(camera_httpd, &servo_uri);
+        httpd_register_uri_handler(camera_httpd, &pose_uri);
         httpd_register_uri_handler(camera_httpd, &capture_uri);
     }
 
     config.server_port += 1;
     config.ctrl_port += 1;
-    Serial.printf("Starting stream server on port: '%d'\n", config.server_port);
+    log_i("Starting stream server on port: '%d'\n", config.server_port);
     if (httpd_start(&stream_httpd, &config) == ESP_OK)
     {
         httpd_register_uri_handler(stream_httpd, &stream_uri);
@@ -524,4 +686,15 @@ void startCameraServer()
         httpd_register_uri_handler(stream_httpd, &stream_qqvga2_uri);
         httpd_register_uri_handler(stream_httpd, &stream_qqvga_uri);
     }
+}
+
+int getNewAngle(int servo_id)
+{
+    if (current_positions[servo_id] != target_positions[servo_id])
+    {
+        current_positions[servo_id] += step_angles[servo_id];
+        return current_positions[servo_id];
+    }
+
+    return -1;
 }

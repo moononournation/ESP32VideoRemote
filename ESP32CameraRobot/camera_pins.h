@@ -82,6 +82,9 @@
 #define HREF_GPIO_NUM     26
 #define PCLK_GPIO_NUM     21
 
+#define I2C_SDA_NUM       12
+#define I2C_SCL_NUM       13
+
 #elif defined(CAMERA_MODEL_M5CAM_PSRAM)
 #define PWDN_GPIO_NUM     -1
 #define RESET_GPIO_NUM    15
@@ -100,6 +103,9 @@
 #define VSYNC_GPIO_NUM    22
 #define HREF_GPIO_NUM     26
 #define PCLK_GPIO_NUM     21
+
+#define I2C_SDA_NUM       12
+#define I2C_SCL_NUM       13
 
 #elif defined(CAMERA_MODEL_M5CAM_PSRAM_WIDE)
 #define PWDN_GPIO_NUM     -1

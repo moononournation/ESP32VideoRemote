@@ -1,9 +1,19 @@
+#define SOFTAP
+#ifdef SOFTAP
+const char *ssid = "ESP32CameraRobot";
+const char *password = "";
+const int channel = 1;
+#else
+const char *ssid = "YourAP";
+const char *password = "PleaseInputYourPasswordHere";
+#endif
+
 // Select camera model
 // #define CAMERA_MODEL_WROVER_KIT
 // #define CAMERA_MODEL_ESP_EYE
-#define CAMERA_MODEL_ESP32_CAM
+// #define CAMERA_MODEL_ESP32_CAM
 // #define CAMERA_MODEL_M5CAM
-// #define CAMERA_MODEL_M5CAM_PSRAM
+#define CAMERA_MODEL_M5CAM_PSRAM
 // #define CAMERA_MODEL_M5CAM_PSRAM_WIDE
 // #define CAMERA_MODEL_AI_THINKER
 
@@ -12,25 +22,26 @@
 #include <esp_wifi.h>
 #include <esp_camera.h>
 
+#define SERVO_FREQ 60 // Analog servos run at ~60 Hz updates
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+
 #include "camera_pins.h"
 
-#define SOFTAP
-#ifdef SOFTAP
-const char* ssid = "ESP32CameraRobot";
-const char* password = "";
-const int channel = 8;
-#else
-const char* ssid = "YourAP";
-const char* password = "YourPassword";
-#endif
+static Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
 void startCameraServer();
+int getNewAngle(int servo_id);
 
 void setup()
 {
-  Serial.begin(115200);
-  Serial.setDebugOutput(true);
-  Serial.println();
+  Wire.begin(I2C_SDA_NUM, I2C_SCL_NUM);
+  pwm.begin();
+  // In theory the internal oscillator is 25MHz but it really isn't
+  // that precise. You can 'calibrate' by tweaking this number till
+  // you get the frequency you're expecting!
+  pwm.setOscillatorFrequency(27000000);  // The int.osc. is closer to 27MHz  
+  pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~60 Hz updates
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -56,13 +67,13 @@ void setup()
   //init with high specs to pre-allocate larger buffers
   if (psramFound())
   {
-    config.frame_size = FRAMESIZE_UXGA;
-    config.jpeg_quality = 4;
+    config.frame_size = FRAMESIZE_VGA;
+    config.jpeg_quality = 10;
     config.fb_count = 2;
   }
   else
   {
-    config.frame_size = FRAMESIZE_VGA;
+    config.frame_size = FRAMESIZE_QVGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
   }
@@ -76,7 +87,7 @@ void setup()
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK)
   {
-    Serial.printf("Camera init failed with error 0x%x", err);
+    log_i("Camera init failed with error 0x%x", err);
     return;
   }
 
@@ -113,25 +124,33 @@ void setup()
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
-    Serial.print(".");
+    log_i(".");
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
+  log_i("WiFi connected");
 #endif
 
   startCameraServer();
 
-  Serial.print("Camera Ready! Use 'http://");
 #ifdef SOFTAP
-  Serial.print(WiFi.softAPIP());
+  log_i("Camera Ready! Use 'http://%s to connect", WiFi.softAPIP().toString());
 #else
-  Serial.print(WiFi.localIP());
+  log_i("Camera Ready! Use 'http://%s to connect", WiFi.localIP().toString());
 #endif
-  Serial.println("' to connect");
 }
 
 void loop()
 {
-  // put your main code here, to run repeatedly:
-  delay(10000);
+  for (int i = 0; i < 16; ++i)
+  {
+    int newAngle = getNewAngle(i);
+    if (newAngle >= 0)
+    {
+      log_i("pwm.writeMicroseconds(%d, %d)", i, newAngle);
+      pwm.writeMicroseconds(i, newAngle);
+    } else {
+      pwm.writeMicroseconds(i, 0);
+    }
+  }
+
+  delay(20);
 }

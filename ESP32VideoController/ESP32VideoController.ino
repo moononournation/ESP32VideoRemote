@@ -6,41 +6,41 @@
 // #define JPG_HEIGHT 480
 // #define DISP_WIDTH 320
 // #define DISP_HEIGHT 240
-// #define RATIO_BOUND 10
-//  #define URL "http://192.168.4.1:81/qvga"
-//  #define JPG_SCALE JPG_SCALE_NONE
-//  #define JPG_WIDTH 320
-//  #define JPG_HEIGHT 240
-//  #define DISP_WIDTH 320
-//  #define DISP_HEIGHT 240
-//  #define RATIO_BOUND 10
+// #define RATIO_BOUND 4
+#define URL "http://192.168.4.1:81/qvga"
+#define JPG_SCALE JPG_SCALE_NONE
+#define JPG_WIDTH 320
+#define JPG_HEIGHT 240
+#define DISP_WIDTH 320
+#define DISP_HEIGHT 240
+#define RATIO_BOUND 4
 // #define URL "http://192.168.4.1:81/hqvga"
 // #define JPG_SCALE JPG_SCALE_NONE
 // #define JPG_WIDTH 240
 // #define JPG_HEIGHT 160
 // #define DISP_WIDTH 240
 // #define DISP_HEIGHT 160
-// #define RATIO_BOUND 10
-#define URL "http://192.168.4.1:81/qcif"
-#define JPG_SCALE JPG_SCALE_NONE
-#define JPG_WIDTH 176
-#define JPG_HEIGHT 144
-#define DISP_WIDTH 176
-#define DISP_HEIGHT 144
-#define RATIO_BOUND 8
+// #define RATIO_BOUND 4
+// #define URL "http://192.168.4.1:81/qcif"
+// #define JPG_SCALE JPG_SCALE_NONE
+// #define JPG_WIDTH 176
+// #define JPG_HEIGHT 144
+// #define DISP_WIDTH 176
+// #define DISP_HEIGHT 144
+// #define RATIO_BOUND 4
 
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <esp_jpg_decode.h>
 #include <SPI.h>
-#include "Arduino_HWSPI.h"
+#include "Arduino_ESP32SPI.h"
 #include "Arduino_GFX.h"    // Core graphics library by Adafruit
 #include "Arduino_ST7789.h" // Hardware-specific library for ST7789 (with or without CS pin)
 
 #define TFT_BL 14
-Arduino_HWSPI *bus = new Arduino_HWSPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
-Arduino_ST7789 *tft = new Arduino_ST7789(bus, 33 /* RST */, 1 /* rotation */, true /* IPS */);
-// Arduino_HWSPI *bus = new Arduino_HWSPI(27 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
+Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
+Arduino_ST7789 *tft = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */);
+// Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(27 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
 // Arduino_ST7789 *tft = new Arduino_ST7789(bus, 33 /* RST */, 3 /* rotation */, true /* IPS */);
 
 typedef struct
@@ -62,7 +62,6 @@ uint16_t *framebuffer = NULL;
 
 void setup()
 {
-  Serial.begin(115200);
   tft->begin();
   tft->fillScreen(BLACK);
   tft->setAddrWindow((tft->width() - DISP_WIDTH) / 2, (tft->height() - DISP_HEIGHT) / 2, DISP_WIDTH, DISP_HEIGHT);
@@ -90,23 +89,23 @@ void loop()
   {
     HTTPClient http;
 
-    Serial.print("[HTTP] begin...\n");
+    log_i("[HTTP] begin...\n");
     http.begin(URL);
 
-    Serial.print("[HTTP] GET...\n");
+    log_i("[HTTP] GET...\n");
     int httpCode = http.GET();
 
-    Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+    log_i("[HTTP] GET... code: %d\n", httpCode);
     // HTTP header has been send and Server response header has been handled
     if (httpCode <= 0)
     {
-      Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+      log_i("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
     }
     else
     {
       if (httpCode != HTTP_CODE_OK)
       {
-        Serial.printf("[HTTP] Not OK!\n");
+        log_i("[HTTP] Not OK!\n");
       }
       else
       {
@@ -168,7 +167,7 @@ void loop()
               }
             }
           }
-          Serial.printf("[HTTP] size: %d\n", curr_buffer->len);
+          log_i("[HTTP] size: %d\n", curr_buffer->len);
 
           stream->find('\n');
           stream->find('\n');
@@ -189,7 +188,7 @@ void loop()
               int c = stream->readBytes(p, s);
               p += c;
 
-              // Serial.printf("[HTTP] read: %d\n", c);
+              // log_i("[HTTP] read: %d\n", c);
 
               if (l > 0)
               {
@@ -200,11 +199,11 @@ void loop()
 
           if (bufflock)
           {
-            drop_frame++;
+            ++drop_frame;
           }
           else
           {
-            decode_frame++;
+            ++decode_frame;
             bufflock = true;
             curr_buffer->offset = 0;
 
@@ -227,13 +226,12 @@ void loop()
               curr_buffer = &buffer1;
             }
           }
-          Serial.printf("[JPG] drop: %d, decode: %d\n", drop_frame, decode_frame);
+          log_i("[JPG] drop: %d, decode: %d\n", drop_frame, decode_frame);
         }
       }
     }
 
-    Serial.println();
-    Serial.print("[HTTP] connection closed.\n");
+    log_i"[HTTP] connection closed.\n");
 
     http.end();
   }
@@ -243,17 +241,17 @@ void drawFramebufferTask(void *parameter)
 {
   buffer_t *b = (buffer_t *)parameter;
 
-  Serial.printf("[JPG] start: %d\n", millis());
+  log_i("[JPG] start: %d\n", millis());
   esp_jpg_decode(b->len, JPG_SCALE, buff_reader, framebuffer_writer, b /* arg */);
-  Serial.printf("[JPG] end: %d\n", millis());
+  log_i("[JPG] end: %d\n", millis());
 
   bufflock = false;
 
-  Serial.printf("[TFT] start: %d\n", millis());
+  log_i("[TFT] start: %d\n", millis());
   tft->startWrite();
-  tft->writePixels(framebuffer, DISP_WIDTH * DISP_HEIGHT * 2);
+  tft->writePixels(framebuffer, DISP_WIDTH * DISP_HEIGHT);
   tft->endWrite();
-  Serial.printf("[TFT] end: %d\n", millis());
+  log_i("[TFT] end: %d\n", millis());
 
   vTaskDelete(NULL);
 }
@@ -281,10 +279,10 @@ static bool framebuffer_writer(void *arg, uint16_t x, uint16_t y, uint16_t w, ui
   if (data)
   {
     uint16_t *pixels = (uint16_t *)data;
-    // Serial.printf("%d, %d, %d, %d\n", x, y, w, h);
-    for (int i = 0; i < h; i++)
+    log_d("%d, %d, %d, %d\n", x, y, w, h);
+    for (int i = 0; i < h; ++i)
     {
-      for (int j = 0; j < w; j++)
+      for (int j = 0; j < w; ++j)
       {
         framebuffer[(y + i) * DISP_WIDTH + x + j] = tft->color565(*(data++), *(data++), *(data++));
       }
