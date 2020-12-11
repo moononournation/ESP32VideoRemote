@@ -32,11 +32,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <esp_jpg_decode.h>
-#include <SPI.h>
-#include "Arduino_ESP32SPI.h"
-#include "Arduino_GFX.h"    // Core graphics library by Adafruit
-#include "Arduino_ST7789.h" // Hardware-specific library for ST7789 (with or without CS pin)
 
+#include "Arduino_GFX_Library.h"
 #define TFT_BL 14
 Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
 Arduino_ST7789 *tft = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */);
