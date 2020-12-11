@@ -33,7 +33,7 @@
 #include <HTTPClient.h>
 #include <esp_jpg_decode.h>
 
-#include "Arduino_GFX_Library.h"
+#include <Arduino_GFX_Library.h>
 #define TFT_BL 14
 Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
 Arduino_ST7789 *tft = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */);
