@@ -293,13 +293,6 @@ static esp_err_t stream_qcif(httpd_req_t *req)
     return stream_handler(req);
 }
 
-static esp_err_t stream_qqvga2(httpd_req_t *req)
-{
-    sensor_t *s = esp_camera_sensor_get();
-    s->set_framesize(s, FRAMESIZE_QQVGA2);
-    return stream_handler(req);
-}
-
 static esp_err_t stream_qqvga(httpd_req_t *req)
 {
     sensor_t *s = esp_camera_sensor_get();
@@ -647,12 +640,6 @@ void startCameraServer()
         .handler = stream_qcif,
         .user_ctx = NULL};
 
-    httpd_uri_t stream_qqvga2_uri = {
-        .uri = "/qqvga2",
-        .method = HTTP_GET,
-        .handler = stream_qqvga2,
-        .user_ctx = NULL};
-
     httpd_uri_t stream_qqvga_uri = {
         .uri = "/qqvga",
         .method = HTTP_GET,
@@ -683,7 +670,6 @@ void startCameraServer()
         httpd_register_uri_handler(stream_httpd, &stream_qvga_uri);
         httpd_register_uri_handler(stream_httpd, &stream_hqvga_uri);
         httpd_register_uri_handler(stream_httpd, &stream_qcif_uri);
-        httpd_register_uri_handler(stream_httpd, &stream_qqvga2_uri);
         httpd_register_uri_handler(stream_httpd, &stream_qqvga_uri);
     }
 }
