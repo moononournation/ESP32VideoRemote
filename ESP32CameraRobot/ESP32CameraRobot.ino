@@ -16,6 +16,7 @@ const char *password = "PleaseInputYourPasswordHere";
 #define CAMERA_MODEL_M5CAM_PSRAM
 // #define CAMERA_MODEL_M5CAM_PSRAM_WIDE
 // #define CAMERA_MODEL_AI_THINKER
+// #define CAMERA_MODEL_JSZWY_CYIS
 
 #include <WiFi.h>
 #include <WiFiAP.h>
