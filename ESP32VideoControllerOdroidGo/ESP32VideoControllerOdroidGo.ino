@@ -13,6 +13,8 @@
 #define MOTOR_LEFT_PATH "/motor?la=255&lb=0&ra=0&rb=255"
 #define MOTOR_RIGHT_PATH "/motor?la=0&lb=255&ra=255&rb=0"
 
+#define FRAMESIZE_QVGA_PATH "/control?var=framesize&val=5"
+
 enum motorCommand
 {
   stop,
@@ -27,8 +29,8 @@ motorCommand lastMotorCommand = stop;
 #include <HTTPClient.h>
 WiFiClient streamClient;
 HTTPClient streamHttp;
-WiFiClient motorClient;
-HTTPClient motorHttp;
+WiFiClient controlClient;
+HTTPClient controlHttp;
 
 /* Arduino_GFX */
 #include <Arduino_GFX_Library.h>
@@ -74,6 +76,10 @@ void loop()
   }
   else
   {
+    controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, FRAMESIZE_QVGA_PATH);
+    controlHttp.GET();
+    controlHttp.end();
+
     log_v("[HTTP] begin...");
     streamHttp.begin(streamClient, HTTP_HOST, STREAM_PORT, STREAM_PATH);
 
@@ -111,7 +117,7 @@ void loop()
           // Play video
           mjpeg.drawJpg();
           unsigned long d = millis() - s - r;
-          // log_v("[Mjpeg] read used: %lu, draw used: %lu", r, d);
+          log_v("[Mjpeg] read used: %lu, draw used: %lu", r, d);
 
           int xVal = analogRead(34);
           int yVal = analogRead(35);
@@ -141,26 +147,26 @@ void loop()
             {
             case forward:
               log_i("forward");
-              motorHttp.begin(motorClient, HTTP_HOST, HTTP_PORT, MOTOR_FORWARD_PATH);
+              controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_FORWARD_PATH);
               break;
             case backward:
               log_i("backward");
-              motorHttp.begin(motorClient, HTTP_HOST, HTTP_PORT, MOTOR_BACKWARD_PATH);
+              controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_BACKWARD_PATH);
               break;
             case left:
               log_i("left");
-              motorHttp.begin(motorClient, HTTP_HOST, HTTP_PORT, MOTOR_LEFT_PATH);
+              controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_LEFT_PATH);
               break;
             case right:
               log_i("right");
-              motorHttp.begin(motorClient, HTTP_HOST, HTTP_PORT, MOTOR_RIGHT_PATH);
+              controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_RIGHT_PATH);
               break;
             default:
               log_i("stop");
-              motorHttp.begin(motorClient, HTTP_HOST, HTTP_PORT, MOTOR_STOP_PATH);
+              controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_STOP_PATH);
             }
-            motorHttp.GET();
-            motorHttp.end();
+            controlHttp.GET();
+            controlHttp.end();
             lastMotorCommand = currentMotorCommand;
           }
         }
