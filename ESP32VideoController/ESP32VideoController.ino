@@ -228,7 +228,7 @@ void loop()
       }
     }
 
-    log_i"[HTTP] connection closed.\n");
+    log_i("[HTTP] connection closed.\n");
 
     http.end();
   }
@@ -275,13 +275,16 @@ static bool framebuffer_writer(void *arg, uint16_t x, uint16_t y, uint16_t w, ui
 {
   if (data)
   {
-    uint16_t *pixels = (uint16_t *)data;
+    uint8_t *pixels = data;
     log_d("%d, %d, %d, %d\n", x, y, w, h);
     for (int i = 0; i < h; ++i)
     {
       for (int j = 0; j < w; ++j)
       {
-        framebuffer[(y + i) * DISP_WIDTH + x + j] = tft->color565(*(data++), *(data++), *(data++));
+        uint8_t r = *(pixels++);
+        uint8_t g = *(pixels++);
+        uint8_t b = *(pixels++);        
+        framebuffer[(y + i) * DISP_WIDTH + x + j] = tft->color565(r, g, b);
       }
     }
   }
