@@ -23,6 +23,7 @@ static xQueueHandle xqh = 0;
 static JPEGDRAW jpegdraws[NUMBER_OF_DRAW_BUFFER];
 static int queue_cnt = 0;
 static int draw_cnt = 0;
+static bool taskCreated = false;
 
 static int queueDrawMCU(JPEGDRAW *pDraw)
 {
@@ -72,6 +73,7 @@ public:
   bool setup(Stream *input, uint8_t *mjpeg_buf, JPEG_DRAW_CALLBACK *pfnDraw, bool enableMultiTask, bool useBigEndian)
   {
     _input = input;
+    _inputindex = 0;
     _mjpeg_buf = mjpeg_buf;
     _pfnDraw = pfnDraw;
     _enableMultiTask = enableMultiTask;
@@ -84,10 +86,14 @@ public:
 
     if (_enableMultiTask)
     {
-      TaskHandle_t task;
-      _p.drawFunc = pfnDraw;
-      xqh = xQueueCreate(NUMBER_OF_DRAW_BUFFER, sizeof(JPEGDRAW));
-      xTaskCreatePinnedToCore(drawTask, "drawTask", 1600, &_p, 1, &task, 0);
+      if (!taskCreated)
+      {
+        TaskHandle_t task;
+        _p.drawFunc = pfnDraw;
+        xqh = xQueueCreate(NUMBER_OF_DRAW_BUFFER, sizeof(JPEGDRAW));
+        xTaskCreatePinnedToCore(drawTask, "drawTask", 1600, &_p, 1, &task, 0);
+        taskCreated = true;
+      }
     }
 
     return true;

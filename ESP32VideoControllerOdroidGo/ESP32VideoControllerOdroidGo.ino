@@ -1,4 +1,4 @@
-#define SSID_NAME "Strider Walker V6"
+#define SSID_NAME "Strider Walker V2"
 #define SSID_PASSWORD ""
 
 #define MJPEG_BUFFER_SIZE (320 * 240 * 2 / 4)
@@ -12,8 +12,9 @@
 #define MOTOR_BACKWARD_PATH "/motor?la=255&lb=0&ra=255&rb=0"
 #define MOTOR_LEFT_PATH "/motor?la=255&lb=0&ra=0&rb=255"
 #define MOTOR_RIGHT_PATH "/motor?la=0&lb=255&ra=255&rb=0"
-
 #define FRAMESIZE_QVGA_PATH "/control?var=framesize&val=5"
+#define LED_ON_PATH "/gpio?pin=4&val=1"
+#define LED_OFF_PATH "/gpio?pin=4&val=0"
 
 enum motorCommand
 {
@@ -24,6 +25,9 @@ enum motorCommand
   right
 };
 motorCommand lastMotorCommand = stop;
+int lastBtnStartStatus = 1;
+int lastBtnAStatus = 1;
+int lastLedCommand = 0;
 
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -63,8 +67,14 @@ void setup()
   digitalWrite(TFT_BL, HIGH);
 #endif
 
-  pinMode(34, INPUT); // X-axis
-  pinMode(35, INPUT); // Y-axis
+  pinMode(13, INPUT_PULLUP); // Button Menu
+  pinMode(0, INPUT_PULLUP);  // Button Volume
+  pinMode(27, INPUT_PULLUP); // Button Select
+  pinMode(39, INPUT_PULLUP); // Button Start
+  pinMode(32, INPUT_PULLUP); // Button A
+  pinMode(33, INPUT_PULLUP); // Button B
+  pinMode(34, INPUT);        // X-axis
+  pinMode(35, INPUT);        // Y-axis
 }
 
 void loop()
@@ -108,7 +118,8 @@ void loop()
         // init Video
         mjpeg.setup(stream, mjpeg_buf, drawMCU, true, true);
 
-        while (streamHttp.connected())
+        bool recycleStream = false;
+        while ((streamHttp.connected()) && (!recycleStream))
         {
           unsigned long s = millis();
           // Read video
@@ -117,12 +128,51 @@ void loop()
           // Play video
           mjpeg.drawJpg();
           unsigned long d = millis() - s - r;
-          log_v("[Mjpeg] read used: %lu, draw used: %lu", r, d);
+          // log_v("[Mjpeg] read used: %lu, draw used: %lu", r, d);
 
+          int btnMenu = digitalRead(13);
+          int btnVolume = digitalRead(0);
+          int btnSelect = digitalRead(27);
+          int btnStart = digitalRead(39);
+          int btnA = digitalRead(32);
+          int btnB = digitalRead(33);
           int xVal = analogRead(34);
           int yVal = analogRead(35);
-          // log_v("xVal: %d, yVal: %d", xVal, yVal);
+          // log_v("btnMenu: %d, btnVolume: %d, btnSelect: %d, btnStart: %d, btnA: %d, btnB: %d, xVal: %d, yVal: %d", btnMenu, btnVolume, btnSelect, btnStart, btnA, btnB, xVal, yVal);
 
+          if (lastBtnStartStatus != btnStart)
+          {
+            if (btnStart == 0) // pressed
+            {
+              log_v("Recycle video stream");
+              recycleStream = true;
+            }
+            lastBtnStartStatus = btnStart;
+          }
+
+          if (lastBtnAStatus != btnA)
+          {
+            if (btnA == 0) // pressed
+            {
+              if (lastLedCommand == 0)
+              {
+                log_v("LED on");
+                controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, LED_ON_PATH);
+                controlHttp.GET();
+                controlHttp.end();
+                lastLedCommand = 1;
+              }
+              else
+              {
+                log_v("LED off");
+                controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, LED_OFF_PATH);
+                controlHttp.GET();
+                controlHttp.end();
+                lastLedCommand = 0;
+              }
+            }
+            lastBtnAStatus = btnA;
+          }
           motorCommand currentMotorCommand = stop;
           if (yVal > 3800)
           {
@@ -170,11 +220,11 @@ void loop()
             lastMotorCommand = currentMotorCommand;
           }
         }
+        stream->flush();
       }
     }
 
     log_v("[HTTP] connection closed.");
-
     streamHttp.end();
   }
 }
