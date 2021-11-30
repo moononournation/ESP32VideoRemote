@@ -38,10 +38,10 @@ HTTPClient controlHttp;
 
 /* Arduino_GFX */
 #include <Arduino_GFX_Library.h>
-#define TFT_BRIGHTNESS 128
 #define TFT_BL 14
 Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
-Arduino_GFX *gfx = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */);
+Arduino_ILI9341 *gfx = new Arduino_ILI9341(bus, -1 /* RST */, 1 /* rotation */);
+// Arduino_GFX *gfx = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */);
 
 /* MJPEG Video */
 #include "MjpegClass.h"
@@ -57,7 +57,7 @@ static int drawMCU(JPEGDRAW *pDraw)
 
 void setup()
 {
-  gfx->begin(80000000);
+  gfx->begin();
   gfx->fillScreen(BLACK);
 
   WiFi.begin(SSID_NAME, SSID_PASSWORD);
