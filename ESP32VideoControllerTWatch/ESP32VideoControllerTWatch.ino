@@ -40,7 +40,7 @@ HTTPClient controlHttp;
 #include <Arduino_GFX_Library.h>
 #define TFT_BL 12
 Arduino_DataBus *bus = new Arduino_ESP32SPI(27 /* DC */, 5 /* CS */, 18 /* SCK */, 19 /* MOSI */, -1 /* MISO */);
-Arduino_ST7789 *gfx = new Arduino_ST7789(bus, -1 /* RST */, 1 /* rotation */, true /* IPS */, 240, 240, 0, 80);
+Arduino_ST7789 *gfx = new Arduino_ST7789(bus, -1 /* RST */, 3 /* rotation */, true /* IPS */, 240, 240, 0, 80);
 
 /* MJPEG Video */
 #include "MjpegClass.h"
