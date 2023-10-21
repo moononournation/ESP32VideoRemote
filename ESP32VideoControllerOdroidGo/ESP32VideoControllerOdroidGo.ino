@@ -1,4 +1,4 @@
-#define SSID_NAME "Strider Walker V2"
+#define SSID_NAME "XIAO nanotank"
 #define SSID_PASSWORD ""
 
 #define MJPEG_BUFFER_SIZE (320 * 240 * 2 / 4)
@@ -40,8 +40,8 @@ HTTPClient controlHttp;
 #include <Arduino_GFX_Library.h>
 #define TFT_BL 14
 Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
-Arduino_ILI9341 *gfx = new Arduino_ILI9341(bus, -1 /* RST */, 3 /* rotation */);
-// Arduino_GFX *gfx = new Arduino_ST7789(bus, -1 /* RST */, 3 /* rotation */, true /* IPS */);
+//Arduino_ILI9341 *gfx = new Arduino_ILI9341(bus, -1 /* RST */, 3 /* rotation */);
+ Arduino_GFX *gfx = new Arduino_ST7789(bus, -1 /* RST */, 3 /* rotation */, true /* IPS */);
 
 /* MJPEG Video */
 #include "MjpegClass.h"
