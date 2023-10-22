@@ -39,9 +39,9 @@ HTTPClient controlHttp;
 /* Arduino_GFX */
 #include <Arduino_GFX_Library.h>
 #define TFT_BL 14
-Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, SCK, MOSI, MISO);
-//Arduino_ILI9341 *gfx = new Arduino_ILI9341(bus, -1 /* RST */, 3 /* rotation */);
- Arduino_GFX *gfx = new Arduino_ST7789(bus, -1 /* RST */, 3 /* rotation */, true /* IPS */);
+Arduino_ESP32SPI *bus = new Arduino_ESP32SPI(21 /* DC */, 5 /* CS */, 18 /* SCK */, 23 /* MOSI */, GFX_NOT_DEFINED /* MISO */);
+// Arduino_ILI9341 *gfx = new Arduino_ILI9341(bus, GFX_NOT_DEFINED /* RST */, 3 /* rotation */);
+Arduino_GFX *gfx = new Arduino_ST7789(bus, GFX_NOT_DEFINED /* RST */, 3 /* rotation */, true /* IPS */);
 
 /* MJPEG Video */
 #include "MjpegClass.h"
@@ -50,22 +50,35 @@ static MjpegClass mjpeg;
 // pixel drawing callback
 static int drawMCU(JPEGDRAW *pDraw)
 {
-  // log_v("Draw pos = %d,%d. size = %d x %d", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
+  // Serial.printf("Draw pos = %d,%d. size = %d x %d\n", pDraw->x, pDraw->y, pDraw->iWidth, pDraw->iHeight);
   gfx->draw16bitBeRGBBitmap(pDraw->x, pDraw->y, pDraw->pPixels, pDraw->iWidth, pDraw->iHeight);
   return 1;
 } /* drawMCU() */
 
 void setup()
 {
-  gfx->begin();
-  gfx->fillScreen(BLACK);
+  Serial.begin(115200);
+  // Serial.setDebugOutput(true);
+  // while(!Serial);
+  Serial.println("ESP32 Video Controller OdroidGo!");
 
-  WiFi.begin(SSID_NAME, SSID_PASSWORD);
+#ifdef GFX_EXTRA_PRE_INIT
+  GFX_EXTRA_PRE_INIT();
+#endif
+
+  // Init Display
+  if (!gfx->begin())
+  {
+    Serial.println("gfx->begin() failed!");
+  }
+  gfx->fillScreen(BLACK);
 
 #ifdef TFT_BL
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
 #endif
+
+  WiFi.begin(SSID_NAME, SSID_PASSWORD);
 
   pinMode(13, INPUT_PULLUP); // Button Menu
   pinMode(0, INPUT_PULLUP);  // Button Volume
@@ -82,6 +95,7 @@ void loop()
   if (WiFi.status() != WL_CONNECTED)
   {
     // wait for WiFi connection
+    Serial.println(".");
     delay(500);
   }
   else
@@ -90,23 +104,23 @@ void loop()
     controlHttp.GET();
     controlHttp.end();
 
-    log_v("[HTTP] begin...");
+    Serial.println("[HTTP] begin...");
     streamHttp.begin(streamClient, HTTP_HOST, STREAM_PORT, STREAM_PATH);
 
-    log_v("[HTTP] GET...");
+    Serial.println("[HTTP] GET...");
     int httpCode = streamHttp.GET();
 
-    log_v("[HTTP] GET... code: %d", httpCode);
+    Serial.printf("[HTTP] GET... code: %d\n", httpCode);
     // HTTP header has been send and Server response header has been handled
     if (httpCode <= 0)
     {
-      log_e("[HTTP] GET... failed, error: %s", streamHttp.errorToString(httpCode).c_str());
+      Serial.printf("[HTTP] GET... failed, error: %s\n", streamHttp.errorToString(httpCode).c_str());
     }
     else
     {
       if (httpCode != HTTP_CODE_OK)
       {
-        log_e("[HTTP] Not OK!");
+        Serial.println("[HTTP] Not OK!");
       }
       else
       {
@@ -128,7 +142,7 @@ void loop()
           // Play video
           mjpeg.drawJpg();
           unsigned long d = millis() - s - r;
-          // log_v("[Mjpeg] read used: %lu, draw used: %lu", r, d);
+          // Serial.printf("[Mjpeg] read used: %lu, draw used: %lu\n", r, d);
 
           int btnMenu = digitalRead(13);
           int btnVolume = digitalRead(0);
@@ -138,13 +152,13 @@ void loop()
           int btnB = digitalRead(33);
           int xVal = analogRead(34);
           int yVal = analogRead(35);
-          // log_v("btnMenu: %d, btnVolume: %d, btnSelect: %d, btnStart: %d, btnA: %d, btnB: %d, xVal: %d, yVal: %d", btnMenu, btnVolume, btnSelect, btnStart, btnA, btnB, xVal, yVal);
+          // Serial.printf("btnMenu: %d, btnVolume: %d, btnSelect: %d, btnStart: %d, btnA: %d, btnB: %d, xVal: %d, yVal: %d\n", btnMenu, btnVolume, btnSelect, btnStart, btnA, btnB, xVal, yVal);
 
           if (lastBtnStartStatus != btnStart)
           {
             if (btnStart == 0) // pressed
             {
-              log_v("Recycle video stream");
+              Serial.println("Recycle video stream");
               recycleStream = true;
             }
             lastBtnStartStatus = btnStart;
@@ -156,7 +170,7 @@ void loop()
             {
               if (lastLedCommand == 0)
               {
-                log_v("LED on");
+                Serial.println("LED on");
                 controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, LED_ON_PATH);
                 controlHttp.GET();
                 controlHttp.end();
@@ -164,7 +178,7 @@ void loop()
               }
               else
               {
-                log_v("LED off");
+                Serial.println("LED off");
                 controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, LED_OFF_PATH);
                 controlHttp.GET();
                 controlHttp.end();
@@ -196,23 +210,23 @@ void loop()
             switch (currentMotorCommand)
             {
             case forward:
-              log_i("forward");
+              Serial.println("forward");
               controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_FORWARD_PATH);
               break;
             case backward:
-              log_i("backward");
+              Serial.println("backward");
               controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_BACKWARD_PATH);
               break;
             case left:
-              log_i("left");
+              Serial.println("left");
               controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_LEFT_PATH);
               break;
             case right:
-              log_i("right");
+              Serial.println("right");
               controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_RIGHT_PATH);
               break;
             default:
-              log_i("stop");
+              Serial.println("stop");
               controlHttp.begin(controlClient, HTTP_HOST, HTTP_PORT, MOTOR_STOP_PATH);
             }
             controlHttp.GET();
@@ -224,7 +238,7 @@ void loop()
       }
     }
 
-    log_v("[HTTP] connection closed.");
+    Serial.println("[HTTP] connection closed.");
     streamHttp.end();
   }
 }
